@@ -3,6 +3,7 @@ import pandas as pd
 from utils.metrics import (
     has_invalid_extra,
     count_name_occurrences,
+    sum_sessions,
     total_channel_watch_time,
     compute_top_titles,
 )
@@ -20,13 +21,14 @@ def process(df: pd.DataFrame) -> dict:
 
     mask = df["extra"].apply(has_invalid_extra)
     df = df[~mask]
-    df = df[df["duration"] <= 350000]
+    df = df[df["duration"] <= 400000]
 
     # TOP kanali po vremenu
     channels_by_time = total_channel_watch_time(df).head(100)
 
     # TOP kanali po korisnicima
-    channels_by_users = count_name_occurrences(df).head(100)
+    sum_sess = sum_sessions(df)
+    channels_by_users = count_name_occurrences(sum_sess).head(100)
 
     # TOP titles
     top_titles = compute_top_titles(df).head(100)

@@ -110,7 +110,7 @@ def has_invalid_extra(x):
     try:
         data = json.loads(x) if x else {}
 
-        for k in ["title", "genre", "startTime", "programId", "duration", "location"]:
+        for k in ["title", "genre", "startTime", "programId", "duration"]:
             if k not in data:
                 return True
 
@@ -128,23 +128,45 @@ def has_invalid_extra(x):
         return True
 
 
-def sum_sessions(df: pd.DataFrame) -> pd.DataFrame:
-    return df.groupby(["devRef", "name"], as_index=False).agg(
-        duration=("duration", "sum")
-    )
+def sum_sessions(df: pd.DataFrame, extra=None) -> pd.DataFrame:
+    group_cols = ["devRef", "name"]
+
+    if extra:
+        if isinstance(extra, list):
+            group_cols.extend(extra)
+        else:
+            group_cols.append(extra)
+
+    return df.groupby(group_cols, as_index=False).agg(duration=("duration", "sum"))
 
 
-def count_name_occurrences(df: pd.DataFrame, min_duration: int = 30000) -> pd.DataFrame:
-    """
-    Broji koliko se koji name pojavljuje sa minimalnim duration.
-    """
-    df = sum_sessions(df)
-    filtered = df[df["duration"] >= min_duration]
+def count_name_occurrences(
+    df: pd.DataFrame,
+    min_duration: int = 30000,
+    group_cols: str | list[str] = "name",
+) -> pd.DataFrame:
+
+    if df.empty:
+        return pd.DataFrame()
+
+    if "duration" not in df.columns:
+        raise ValueError("Column 'duration' does not exist in DataFrame")
+
+    # osiguraj da je lista
+    if isinstance(group_cols, str):
+        group_cols = [group_cols]
+
+    # provjera da kolone postoje
+    missing = [col for col in group_cols if col not in df.columns]
+    if missing:
+        raise ValueError(f"Columns not found: {missing}")
+
+    filtered = df[(df["duration"].isna()) | (df["duration"] >= min_duration)]
 
     return (
-        filtered.groupby("name")
+        filtered.groupby(group_cols, as_index=False)
         .size()
-        .reset_index(name="count")
+        .rename(columns={"size": "count"})
         .sort_values(by="count", ascending=False)
     )
 
