@@ -1,0 +1,28 @@
+services:
+  airflow:
+    image: apache/airflow:2.9.0-python3.11
+
+    container_name: airflow_local
+
+    ports:
+      - "8080:8080"
+
+    environment:
+      AIRFLOW__CORE__LOAD_EXAMPLES: "False"
+      AIRFLOW__CORE__EXECUTOR: SequentialExecutor
+
+    volumes:
+      - ./dags:/opt/airflow/dags
+      - ./processors:/opt/airflow/processors
+      - ./utils:/opt/airflow/utils
+      - ./output:/opt/airflow/output
+      - ./requirements.txt:/requirements.txt
+      - airflow_data:/opt/airflow
+
+    command: >
+      bash -c "
+      pip install -r /requirements.txt &&
+      airflow standalone
+      "
+volumes:
+  airflow_data:      

@@ -7,12 +7,16 @@ from utils.metrics import (
 )
 
 
-def process(df: pd.DataFrame) -> pd.DataFrame:
+def process(df: pd.DataFrame) -> dict[str, pd.DataFrame]:
+    if df.empty:
+        return {
+            "result": pd.DataFrame(),
+        }
 
     df = df.copy()
     mask = df["extra"].apply(has_invalid_extra)
-    df = df[~mask]
-    df = df[df["duration"] <= 400000]
+    df = df[~mask]  # type: ignore
+    df = df[df["duration"] <= 400000]  # type: ignore
 
     df = extract_columns_from_extra(
         df,
@@ -25,4 +29,4 @@ def process(df: pd.DataFrame) -> pd.DataFrame:
     sum_sess = sum_sessions(df, ["programId", "title"])
 
     result = count_name_occurrences(sum_sess, 0, ["name", "title"])
-    return result
+    return {"result": result}

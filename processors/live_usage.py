@@ -9,7 +9,8 @@ from utils.metrics import (
 )
 
 
-def process(df: pd.DataFrame) -> dict:
+def process(df: pd.DataFrame) -> dict[str, pd.DataFrame]:
+
     if df.empty:
         return {
             "channels_by_time": pd.DataFrame(),
@@ -17,21 +18,17 @@ def process(df: pd.DataFrame) -> dict:
             "top_titles": pd.DataFrame(),
         }
 
-    df = df.copy()
+    mask = df["extra"].map(has_invalid_extra)
 
-    mask = df["extra"].apply(has_invalid_extra)
-    df = df[~mask]
-    df = df[df["duration"] <= 400000]
+    df = df.loc[~mask]  # type: ignore
 
-    # TOP kanali po vremenu
-    channels_by_time = total_channel_watch_time(df).head(100)
-
-    # TOP kanali po korisnicima
     sum_sess = sum_sessions(df)
-    channels_by_users = count_name_occurrences(sum_sess).head(100)
 
-    # TOP titles
-    top_titles = compute_top_titles(df).head(100)
+    channels_by_time = total_channel_watch_time(sum_sess)
+
+    channels_by_users = count_name_occurrences(sum_sess)
+
+    top_titles = compute_top_titles(df)
 
     return {
         "channels_by_time": channels_by_time,

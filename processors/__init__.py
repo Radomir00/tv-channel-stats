@@ -1,3 +1,7 @@
+from typing import Callable, Dict
+import pandas as pd
+
+# import svih processora
 from .cu_asset_viewed import process as process_cu_asset_viewed
 from .live_usage import process as process_live_usage
 from .media_seen_program import process as process_media_seen_program
@@ -12,11 +16,14 @@ from .shop_loaded import process as process_shop_loaded
 from .startover_usage import process as process_startover_usage
 from .vod_usage_movie import process as process_vod_usage_movie
 
-# # fallback processor
+# default fallback
 from .default import process as process_default
 
 
-PROCESSORS = {
+Processor = Callable[[pd.DataFrame], dict[str, pd.DataFrame]]
+
+
+PROCESSORS: Dict[str, Processor] = {
     "CUAssetViewed": process_cu_asset_viewed,
     "LiveUsage": process_live_usage,
     "mediaSeen_PROGRAM": process_media_seen_program,
@@ -33,5 +40,5 @@ PROCESSORS = {
 }
 
 
-def get_processor(event_type):
+def get_processor(event_type: str) -> Processor:
     return PROCESSORS.get(event_type, process_default)

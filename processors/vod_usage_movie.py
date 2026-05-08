@@ -5,7 +5,11 @@ from utils.metrics import (
 )
 
 
-def process(df: pd.DataFrame) -> pd.DataFrame:
+def process(df: pd.DataFrame) -> dict[str, pd.DataFrame]:
+    if df.empty:
+        return {
+            "result": pd.DataFrame(),
+        }
     df = df.copy()
     df = df[df["duration"] <= 400000]
 
@@ -14,4 +18,4 @@ def process(df: pd.DataFrame) -> pd.DataFrame:
     sum_sess = sum_sessions(df)
 
     result = count_name_occurrences(sum_sess, 0)
-    return result
+    return {"result": result}

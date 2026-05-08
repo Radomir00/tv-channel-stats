@@ -7,7 +7,11 @@ from utils.metrics import (
 )
 
 
-def process(df: pd.DataFrame) -> pd.DataFrame:
+def process(df: pd.DataFrame) -> dict[str, pd.DataFrame]:
+    if df.empty:
+        return {
+            "result": pd.DataFrame(),
+        }
 
     df = df.copy()
     mask = df["extra"].apply(has_invalid_extra)
@@ -25,4 +29,5 @@ def process(df: pd.DataFrame) -> pd.DataFrame:
     sum_sess = sum_sessions(df, ["programId"])
 
     result = count_name_occurrences(sum_sess, 0, ["name", "programId"])
-    return result
+
+    return {"result": result}
