@@ -11,6 +11,7 @@ def optimize_dataframe(df: pd.DataFrame) -> pd.DataFrame:
         "type",
         "name",
         "devRef",
+        "timeZone",
     ]
 
     for col in category_cols:
@@ -32,7 +33,6 @@ def optimize_dataframe(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def load_event_types() -> list[str]:
-
     query = text("""
         SELECT DISTINCT type
         FROM statistic
@@ -50,7 +50,9 @@ def load_event_data(event_type: str) -> pd.DataFrame:
                 devRef,
                 name,
                 duration,
-                extra
+                extra,
+                insertedTS,
+                timeZone
             FROM statistic
             WHERE type = :event_type
               AND duration <= 400000

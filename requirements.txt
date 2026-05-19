@@ -3,3 +3,4 @@ sqlalchemy
 pymysql
 pyarrow
 orjson
+psycopg2-binary

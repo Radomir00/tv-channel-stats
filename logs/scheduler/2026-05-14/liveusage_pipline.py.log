@@ -1,0 +1,28 @@
+[2026-05-14T11:02:23.163+0000] {processor.py:161} INFO - Started process (PID=72) to work on /opt/airflow/dags/liveusage_pipline.py
+[2026-05-14T11:02:23.165+0000] {processor.py:830} INFO - Processing file /opt/airflow/dags/liveusage_pipline.py for tasks to queue
+[2026-05-14T11:02:23.168+0000] {logging_mixin.py:188} INFO - [2026-05-14T11:02:23.168+0000] {dagbag.py:540} INFO - Filling up the DagBag from /opt/airflow/dags/liveusage_pipline.py
+[2026-05-14T11:02:23.667+0000] {processor.py:840} INFO - DAG(s) 'liveusage_pipeline' retrieved from /opt/airflow/dags/liveusage_pipline.py
+[2026-05-14T11:02:23.685+0000] {logging_mixin.py:188} INFO - [2026-05-14T11:02:23.684+0000] {dag.py:3096} INFO - Sync 1 DAGs
+[2026-05-14T11:02:23.695+0000] {logging_mixin.py:188} INFO - [2026-05-14T11:02:23.694+0000] {dag.py:3954} INFO - Setting next_dagrun for liveusage_pipeline to None, run_after=None
+[2026-05-14T11:02:23.720+0000] {processor.py:183} INFO - Processing /opt/airflow/dags/liveusage_pipline.py took 0.564 seconds
+[2026-05-14T11:02:54.397+0000] {processor.py:161} INFO - Started process (PID=84) to work on /opt/airflow/dags/liveusage_pipline.py
+[2026-05-14T11:02:54.398+0000] {processor.py:830} INFO - Processing file /opt/airflow/dags/liveusage_pipline.py for tasks to queue
+[2026-05-14T11:02:54.400+0000] {logging_mixin.py:188} INFO - [2026-05-14T11:02:54.400+0000] {dagbag.py:540} INFO - Filling up the DagBag from /opt/airflow/dags/liveusage_pipline.py
+[2026-05-14T11:02:54.802+0000] {processor.py:840} INFO - DAG(s) 'liveusage_pipeline' retrieved from /opt/airflow/dags/liveusage_pipline.py
+[2026-05-14T11:02:54.862+0000] {logging_mixin.py:188} INFO - [2026-05-14T11:02:54.861+0000] {dag.py:3096} INFO - Sync 1 DAGs
+[2026-05-14T11:02:54.868+0000] {logging_mixin.py:188} INFO - [2026-05-14T11:02:54.867+0000] {dag.py:3954} INFO - Setting next_dagrun for liveusage_pipeline to None, run_after=None
+[2026-05-14T11:02:54.886+0000] {processor.py:183} INFO - Processing /opt/airflow/dags/liveusage_pipline.py took 0.496 seconds
+[2026-05-14T11:03:25.732+0000] {processor.py:161} INFO - Started process (PID=88) to work on /opt/airflow/dags/liveusage_pipline.py
+[2026-05-14T11:03:25.734+0000] {processor.py:830} INFO - Processing file /opt/airflow/dags/liveusage_pipline.py for tasks to queue
+[2026-05-14T11:03:25.735+0000] {logging_mixin.py:188} INFO - [2026-05-14T11:03:25.735+0000] {dagbag.py:540} INFO - Filling up the DagBag from /opt/airflow/dags/liveusage_pipline.py
+[2026-05-14T11:03:26.120+0000] {processor.py:840} INFO - DAG(s) 'liveusage_pipeline' retrieved from /opt/airflow/dags/liveusage_pipline.py
+[2026-05-14T11:03:26.169+0000] {logging_mixin.py:188} INFO - [2026-05-14T11:03:26.169+0000] {dag.py:3096} INFO - Sync 1 DAGs
+[2026-05-14T11:03:26.175+0000] {logging_mixin.py:188} INFO - [2026-05-14T11:03:26.174+0000] {dag.py:3954} INFO - Setting next_dagrun for liveusage_pipeline to None, run_after=None
+[2026-05-14T11:03:26.205+0000] {processor.py:183} INFO - Processing /opt/airflow/dags/liveusage_pipline.py took 0.478 seconds
+[2026-05-14T11:03:57.109+0000] {processor.py:161} INFO - Started process (PID=92) to work on /opt/airflow/dags/liveusage_pipline.py
+[2026-05-14T11:03:57.111+0000] {processor.py:830} INFO - Processing file /opt/airflow/dags/liveusage_pipline.py for tasks to queue
+[2026-05-14T11:03:57.114+0000] {logging_mixin.py:188} INFO - [2026-05-14T11:03:57.113+0000] {dagbag.py:540} INFO - Filling up the DagBag from /opt/airflow/dags/liveusage_pipline.py
+[2026-05-14T11:03:57.615+0000] {processor.py:840} INFO - DAG(s) 'liveusage_pipeline' retrieved from /opt/airflow/dags/liveusage_pipline.py
+[2026-05-14T11:03:57.691+0000] {logging_mixin.py:188} INFO - [2026-05-14T11:03:57.690+0000] {dag.py:3096} INFO - Sync 1 DAGs
+[2026-05-14T11:03:57.701+0000] {logging_mixin.py:188} INFO - [2026-05-14T11:03:57.701+0000] {dag.py:3954} INFO - Setting next_dagrun for liveusage_pipeline to None, run_after=None
+[2026-05-14T11:03:57.735+0000] {processor.py:183} INFO - Processing /opt/airflow/dags/liveusage_pipline.py took 0.637 seconds

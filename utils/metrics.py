@@ -63,39 +63,14 @@ def extract_columns_from_extra(
 
 def compute_top_titles(
     df: pd.DataFrame,
-    min_watch_percentage: float = 0.75,
 ) -> pd.DataFrame:
 
     if df.empty:
         return pd.DataFrame(columns=["programId", "name", "title", "viewer_count"])
 
-    # Rename session duration
-    df = df.rename(columns={"duration": "session_duration"})
-
-    # Izvlačenje podataka iz extra kolone
-    df = extract_columns_from_extra(
-        df,
-        column="extra",
-        keys=["title", "programId", "duration"],
-    )
-
-    df["duration"] = pd.to_numeric(df["duration"], errors="coerce")
-
-    # Ukupno vreme gledanja po korisniku
-    df_user = df.groupby(
-        ["devRef", "programId", "name", "title", "duration"],
-        observed=True,
-        as_index=False,
-    ).agg(user_watch_time=("session_duration", "sum"))
-
-    # Filter: korisnik mora odgledati dovoljno
-    threshold = min_watch_percentage * df_user["duration"]
-
-    df_user = df_user[df_user["user_watch_time"] >= threshold]
-
     # Brojanje jedinstvenih gledalaca
     top_titles = (
-        df_user.groupby(
+        df.groupby(
             ["programId", "name", "title"],
             observed=True,
         )["devRef"]
@@ -124,7 +99,7 @@ def sum_sessions(df: pd.DataFrame, extra=None) -> pd.DataFrame:
         group_cols,
         as_index=False,
         observed=True,
-    ).agg(duration=("duration", "sum"))
+    ).agg(duration=("total_duration", "sum"))
 
 
 def count_name_occurrences(
@@ -132,6 +107,8 @@ def count_name_occurrences(
     min_duration: int = 30000,
     group_cols: str | list[str] = "name",
 ) -> pd.DataFrame:
+
+    df = sum_sessions(df)
 
     if df.empty:
         return pd.DataFrame()
@@ -163,8 +140,256 @@ def count_name_occurrences(
 
 
 def total_channel_watch_time(df: pd.DataFrame) -> pd.DataFrame:
+    df = sum_sessions(df)
     return (
         df.groupby("name", as_index=False, observed=True)
         .agg(total_watch_time=("duration", "sum"))
         .sort_values(by="total_watch_time", ascending=False)
     )
+
+
+def process_top_name_watch_time(
+    df: pd.DataFrame,
+) -> pd.DataFrame:
+
+    top_name = count_name_occurrences(df).rename(
+        columns={
+            "count": "viewer_count",
+        }
+    )
+
+    watch_time = total_channel_watch_time(df)
+
+    result = top_name.merge(
+        watch_time,
+        on="name",
+        how="outer",
+    ).fillna(
+        {
+            "viewer_count": 0,
+            "total_watch_time": 0,
+        }
+    )
+
+    result["viewer_count"] = result["viewer_count"].astype("int64")
+
+    result["total_watch_time"] = result["total_watch_time"].astype("int64")
+
+    result = result.sort_values(
+        by=[
+            "viewer_count",
+            "total_watch_time",
+        ],
+        ascending=False,
+        ignore_index=True,
+    )
+
+    return result
+
+
+def build_sessions(
+    df: pd.DataFrame,
+    max_gap_ms: int = 400000,
+    heartbeat_ms: int = 300000,
+) -> pd.DataFrame:
+    group_cols = ["devRef", "name", "extra"]
+
+    df = df.copy()
+    df["insertedTS"] = pd.to_datetime(df["insertedTS"])
+
+    df["event_start_ts"] = df["insertedTS"] + pd.to_timedelta(
+        heartbeat_ms - df["duration"],
+        unit="ms",
+    )
+
+    df["event_end_ts"] = df["insertedTS"] + pd.to_timedelta(
+        df["duration"],
+        unit="ms",
+    )
+
+    df = df.sort_values(group_cols + ["event_start_ts"])
+
+    df["prev_end_ts"] = df.groupby(group_cols)["event_end_ts"].shift()
+
+    df["gap"] = (df["event_start_ts"] - df["prev_end_ts"]).dt.total_seconds() * 1000
+
+    df["new_session"] = df["gap"].isna() | (df["gap"] > max_gap_ms)
+
+    df["session_id"] = df.groupby(group_cols)["new_session"].cumsum()
+
+    sessions = df.groupby(
+        group_cols + ["session_id"],
+        as_index=False,
+        observed=True,
+    ).agg(
+        start_ts=("event_start_ts", "min"),
+        end_ts=("event_end_ts", "max"),
+        timezone=("timeZone", "first"),
+        event_count=("insertedTS", "count"),
+        duration=("duration", "sum"),
+    )
+
+    invalid_mask = sessions["end_ts"] < sessions["start_ts"]
+
+    start_ts = pd.to_datetime(sessions.loc[invalid_mask, "start_ts"])
+
+    duration_td = pd.to_timedelta(
+        sessions.loc[invalid_mask, "duration"],
+        unit="ms",
+    )
+
+    sessions.loc[invalid_mask, "end_ts"] = start_ts + duration_td
+
+    sessions["total_duration"] = (
+        sessions["end_ts"] - sessions["start_ts"]
+    ).dt.total_seconds() * 1000
+
+    sessions["start_ts"] = sessions["start_ts"].dt.floor("s")
+    sessions["end_ts"] = sessions["end_ts"].dt.floor("s")
+
+    return sessions.drop(columns=["session_id"])
+
+
+def build_iptv_sessions(
+    df: pd.DataFrame,
+    max_gap_ms: int = 400000,
+    heartbeat_ms: int = 300000,
+) -> pd.DataFrame:
+    df_sessions = build_sessions(
+        df,
+        max_gap_ms=max_gap_ms,
+        heartbeat_ms=heartbeat_ms,
+    )
+
+    df_sessions = extract_columns_from_extra(
+        df_sessions,
+        "extra",
+        ["title", "genre", "startTime", "programId", "duration", "location"],
+    )
+
+    df_sessions = df_sessions[df_sessions["duration"] > 0]
+
+    df_sessions["program_start"] = pd.to_datetime(
+        df_sessions["startTime"],
+        unit="ms",
+        utc=True,
+    )
+
+    df_sessions.drop(columns=["startTime"], inplace=True)
+
+    df_sessions["offset_hours"] = (
+        df_sessions["timezone"].str.extract(r"([+-]\d{2})", expand=False).astype(int)
+    )
+
+    df_sessions["program_start_local"] = df_sessions["program_start"].dt.tz_localize(
+        None
+    ) + pd.to_timedelta(df_sessions["offset_hours"], unit="h")
+
+    df_sessions.drop(
+        columns=["timezone", "program_start", "offset_hours"],
+        inplace=True,
+    )
+
+    columns = [
+        "devRef",
+        "name",
+        "title",
+        "genre",
+        "programId",
+        "location",
+        "program_start_local",
+        "start_ts",
+        "end_ts",
+        "duration",
+        "total_duration",
+    ]
+
+    result: pd.DataFrame = pd.DataFrame(df_sessions.loc[:, columns]).copy()
+
+    return result
+
+
+def compute_watch_ranges(
+    df: pd.DataFrame,
+) -> pd.DataFrame:
+
+    df["total_duration"] = pd.to_numeric(
+        df["total_duration"],
+        errors="coerce",
+    )
+
+    df["duration"] = pd.to_numeric(
+        df["duration"],
+        errors="coerce",
+    )
+
+    df["watch_ratio"] = df["total_duration"] / df["duration"]
+
+    conditions = [
+        (df["watch_ratio"] >= 0.75),
+        ((df["watch_ratio"] >= 0.50) & (df["watch_ratio"] < 0.75)),
+        ((df["watch_ratio"] >= 0.25) & (df["watch_ratio"] < 0.50)),
+        (df["watch_ratio"] < 0.25),
+    ]
+
+    choices = [
+        "75-100%",
+        "50-75%",
+        "25-50%",
+        "0-25%",
+    ]
+
+    df["watch_group"] = pd.NA
+
+    for cond, value in zip(
+        conditions,
+        choices,
+    ):
+        df.loc[
+            cond,
+            "watch_group",
+        ] = value
+
+    grouped = (
+        df.groupby(
+            [
+                "name",
+                "title",
+                "programId",
+                "watch_group",
+            ],
+            observed=True,
+        )["devRef"]
+        .nunique()
+        .unstack(fill_value=0)
+        .reset_index()
+    )
+
+    # osiguraj da sve kolone postoje
+    for col in choices:
+        if col not in grouped.columns:
+            grouped[col] = 0
+
+    result = grouped[
+        [
+            "name",
+            "title",
+            "programId",
+            "75-100%",
+            "50-75%",
+            "25-50%",
+            "0-25%",
+        ]
+    ]
+
+    result = result.sort_values(
+        by=[
+            "75-100%",
+            "50-75%",
+            "25-50%",
+            "0-25%",
+        ],
+        ascending=False,
+    )  # type: ignore
+
+    return result

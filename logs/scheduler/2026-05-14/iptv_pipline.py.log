@@ -1,0 +1,28 @@
+[2026-05-14T11:02:24.841+0000] {processor.py:161} INFO - Started process (PID=75) to work on /opt/airflow/dags/iptv_pipline.py
+[2026-05-14T11:02:24.842+0000] {processor.py:830} INFO - Processing file /opt/airflow/dags/iptv_pipline.py for tasks to queue
+[2026-05-14T11:02:24.845+0000] {logging_mixin.py:188} INFO - [2026-05-14T11:02:24.844+0000] {dagbag.py:540} INFO - Filling up the DagBag from /opt/airflow/dags/iptv_pipline.py
+[2026-05-14T11:02:25.455+0000] {processor.py:840} INFO - DAG(s) 'event_processing_pipeline' retrieved from /opt/airflow/dags/iptv_pipline.py
+[2026-05-14T11:02:25.472+0000] {logging_mixin.py:188} INFO - [2026-05-14T11:02:25.471+0000] {dag.py:3096} INFO - Sync 1 DAGs
+[2026-05-14T11:02:25.482+0000] {logging_mixin.py:188} INFO - [2026-05-14T11:02:25.482+0000] {dag.py:3954} INFO - Setting next_dagrun for event_processing_pipeline to None, run_after=None
+[2026-05-14T11:02:25.506+0000] {processor.py:183} INFO - Processing /opt/airflow/dags/iptv_pipline.py took 0.670 seconds
+[2026-05-14T11:02:56.048+0000] {processor.py:161} INFO - Started process (PID=86) to work on /opt/airflow/dags/iptv_pipline.py
+[2026-05-14T11:02:56.049+0000] {processor.py:830} INFO - Processing file /opt/airflow/dags/iptv_pipline.py for tasks to queue
+[2026-05-14T11:02:56.051+0000] {logging_mixin.py:188} INFO - [2026-05-14T11:02:56.051+0000] {dagbag.py:540} INFO - Filling up the DagBag from /opt/airflow/dags/iptv_pipline.py
+[2026-05-14T11:02:56.688+0000] {processor.py:840} INFO - DAG(s) 'event_processing_pipeline' retrieved from /opt/airflow/dags/iptv_pipline.py
+[2026-05-14T11:02:56.745+0000] {logging_mixin.py:188} INFO - [2026-05-14T11:02:56.745+0000] {dag.py:3096} INFO - Sync 1 DAGs
+[2026-05-14T11:02:56.751+0000] {logging_mixin.py:188} INFO - [2026-05-14T11:02:56.751+0000] {dag.py:3954} INFO - Setting next_dagrun for event_processing_pipeline to None, run_after=None
+[2026-05-14T11:02:56.773+0000] {processor.py:183} INFO - Processing /opt/airflow/dags/iptv_pipline.py took 0.730 seconds
+[2026-05-14T11:03:27.297+0000] {processor.py:161} INFO - Started process (PID=90) to work on /opt/airflow/dags/iptv_pipline.py
+[2026-05-14T11:03:27.299+0000] {processor.py:830} INFO - Processing file /opt/airflow/dags/iptv_pipline.py for tasks to queue
+[2026-05-14T11:03:27.303+0000] {logging_mixin.py:188} INFO - [2026-05-14T11:03:27.302+0000] {dagbag.py:540} INFO - Filling up the DagBag from /opt/airflow/dags/iptv_pipline.py
+[2026-05-14T11:03:27.853+0000] {processor.py:840} INFO - DAG(s) 'event_processing_pipeline' retrieved from /opt/airflow/dags/iptv_pipline.py
+[2026-05-14T11:03:27.868+0000] {logging_mixin.py:188} INFO - [2026-05-14T11:03:27.867+0000] {dag.py:3096} INFO - Sync 1 DAGs
+[2026-05-14T11:03:27.879+0000] {logging_mixin.py:188} INFO - [2026-05-14T11:03:27.878+0000] {dag.py:3954} INFO - Setting next_dagrun for event_processing_pipeline to None, run_after=None
+[2026-05-14T11:03:27.902+0000] {processor.py:183} INFO - Processing /opt/airflow/dags/iptv_pipline.py took 0.617 seconds
+[2026-05-14T11:03:58.879+0000] {processor.py:161} INFO - Started process (PID=94) to work on /opt/airflow/dags/iptv_pipline.py
+[2026-05-14T11:03:58.881+0000] {processor.py:830} INFO - Processing file /opt/airflow/dags/iptv_pipline.py for tasks to queue
+[2026-05-14T11:03:58.885+0000] {logging_mixin.py:188} INFO - [2026-05-14T11:03:58.885+0000] {dagbag.py:540} INFO - Filling up the DagBag from /opt/airflow/dags/iptv_pipline.py
+[2026-05-14T11:03:59.673+0000] {processor.py:840} INFO - DAG(s) 'event_processing_pipeline' retrieved from /opt/airflow/dags/iptv_pipline.py
+[2026-05-14T11:03:59.688+0000] {logging_mixin.py:188} INFO - [2026-05-14T11:03:59.687+0000] {dag.py:3096} INFO - Sync 1 DAGs
+[2026-05-14T11:03:59.699+0000] {logging_mixin.py:188} INFO - [2026-05-14T11:03:59.698+0000] {dag.py:3954} INFO - Setting next_dagrun for event_processing_pipeline to None, run_after=None
+[2026-05-14T11:03:59.722+0000] {processor.py:183} INFO - Processing /opt/airflow/dags/iptv_pipline.py took 0.852 seconds

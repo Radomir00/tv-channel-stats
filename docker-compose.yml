@@ -1,15 +1,36 @@
 services:
-  airflow:
+
+  postgres:
+    image: postgres:15
+
+    container_name: airflow_postgres
+
+    restart: unless-stopped
+
+    environment:
+      POSTGRES_USER: airflow
+      POSTGRES_PASSWORD: airflow
+      POSTGRES_DB: airflow
+
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  airflow-init:
     image: apache/airflow:2.9.0-python3.11
 
-    container_name: airflow_local
+    container_name: airflow_init
 
-    ports:
-      - "8080:8080"
+    depends_on:
+      - postgres
 
     environment:
       AIRFLOW__CORE__LOAD_EXAMPLES: "False"
-      AIRFLOW__CORE__EXECUTOR: SequentialExecutor
+
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres/airflow
+
+      AIRFLOW__WEBSERVER__SECRET_KEY: "super_secret_airflow_key"
 
     volumes:
       - ./dags:/opt/airflow/dags
@@ -17,12 +38,95 @@ services:
       - ./utils:/opt/airflow/utils
       - ./output:/opt/airflow/output
       - ./requirements.txt:/requirements.txt
-      - airflow_data:/opt/airflow
 
     command: >
       bash -c "
       pip install -r /requirements.txt &&
-      airflow standalone
+      airflow db migrate &&
+      airflow users create \
+      --username admin \
+      --firstname Admin \
+      --lastname User \
+      --role Admin \
+      --email admin@example.com \
+      --password admin123 || true
       "
+
+  airflow-webserver:
+    image: apache/airflow:2.9.0-python3.11
+
+    container_name: airflow_webserver
+
+    restart: unless-stopped
+
+    depends_on:
+      - postgres
+      - airflow-init
+
+    ports:
+      - "8080:8080"
+
+    environment:
+      AIRFLOW__CORE__LOAD_EXAMPLES: "False"
+
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres/airflow
+
+      AIRFLOW__WEBSERVER__SECRET_KEY: "super_secret_airflow_key"
+
+    volumes:
+      - ./dags:/opt/airflow/dags
+      - ./processors:/opt/airflow/processors
+      - ./utils:/opt/airflow/utils
+      - ./output:/opt/airflow/output
+      - ./requirements.txt:/requirements.txt
+
+    command: >
+      bash -c "
+      pip install -r /requirements.txt &&
+      airflow webserver
+      "
+
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+  airflow-scheduler:
+    image: apache/airflow:2.9.0-python3.11
+
+    container_name: airflow_scheduler
+
+    restart: unless-stopped
+
+    depends_on:
+      - postgres
+      - airflow-init
+
+    environment:
+      AIRFLOW__CORE__LOAD_EXAMPLES: "False"
+
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres/airflow
+
+      AIRFLOW__WEBSERVER__SECRET_KEY: "super_secret_airflow_key"
+
+    volumes:
+      - ./dags:/opt/airflow/dags
+      - ./processors:/opt/airflow/processors
+      - ./utils:/opt/airflow/utils
+      - ./output:/opt/airflow/output
+      - ./requirements.txt:/requirements.txt
+
+    command: >
+      bash -c "
+      pip install -r /requirements.txt &&
+      airflow scheduler
+      "
+
 volumes:
-  airflow_data:      
+  postgres_data:

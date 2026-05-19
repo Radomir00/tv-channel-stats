@@ -19,7 +19,6 @@ def process(df: pd.DataFrame) -> dict[str, pd.DataFrame]:
         }
 
     mask = df["extra"].map(has_invalid_extra)
-
     df = df.loc[~mask]  # type: ignore
 
     sum_sess = sum_sessions(df)
