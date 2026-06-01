@@ -86,7 +86,7 @@ def compute_top_titles(
     return top_titles
 
 
-def sum_sessions(df: pd.DataFrame, extra=None) -> pd.DataFrame:
+def sum_sessions(df: pd.DataFrame, extra=None, dur: str = "duration") -> pd.DataFrame:
     group_cols = ["devRef", "name"]
 
     if extra:
@@ -99,7 +99,7 @@ def sum_sessions(df: pd.DataFrame, extra=None) -> pd.DataFrame:
         group_cols,
         as_index=False,
         observed=True,
-    ).agg(duration=("total_duration", "sum"))
+    ).agg(duration=(dur, "sum"))
 
 
 def count_name_occurrences(
@@ -107,8 +107,6 @@ def count_name_occurrences(
     min_duration: int = 30000,
     group_cols: str | list[str] = "name",
 ) -> pd.DataFrame:
-
-    df = sum_sessions(df)
 
     if df.empty:
         return pd.DataFrame()
@@ -209,13 +207,19 @@ def build_sessions(
 
     df = df.sort_values(group_cols + ["event_start_ts"])
 
-    df["prev_end_ts"] = df.groupby(group_cols)["event_end_ts"].shift()
+    df["prev_end_ts"] = df.groupby(
+        group_cols,
+        observed=True,
+    )["event_end_ts"].shift()
 
     df["gap"] = (df["event_start_ts"] - df["prev_end_ts"]).dt.total_seconds() * 1000
 
     df["new_session"] = df["gap"].isna() | (df["gap"] > max_gap_ms)
 
-    df["session_id"] = df.groupby(group_cols)["new_session"].cumsum()
+    df["session_id"] = df.groupby(
+        group_cols,
+        observed=True,
+    )["new_session"].cumsum()
 
     sessions = df.groupby(
         group_cols + ["session_id"],
@@ -393,3 +397,22 @@ def compute_watch_ranges(
     )  # type: ignore
 
     return result
+
+
+def merge_name_with_fallback(
+    df: pd.DataFrame,
+    df_live: pd.DataFrame,
+) -> pd.DataFrame:
+
+    strict_map = df_live.drop_duplicates(["programId", "title"]).set_index(
+        ["programId", "title"]
+    )["name"]
+
+    df["name"] = df.set_index(["programId", "title"]).index.map(strict_map)  # type: ignore
+
+    title_map = df_live.drop_duplicates(["title"]).set_index("title")["name"]
+
+    missing = df["name"].isna()
+    df.loc[missing, "name"] = df.loc[missing, "title"].map(title_map)  # type: ignore
+
+    return df

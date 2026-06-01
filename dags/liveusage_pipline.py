@@ -1,7 +1,8 @@
 import os
 import sys
-
-from datetime import datetime, date
+import pyarrow as pa
+import pyarrow.parquet as pq
+from datetime import datetime
 
 import pandas as pd
 
@@ -10,157 +11,161 @@ from airflow.decorators import dag, task
 sys.path.append("/opt/airflow")
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from utils.load import load_event_data
+from utils.load import load_data, optimize_dataframe
 from utils.save import save_result
+from utils.metrics import has_invalid_extra, build_iptv_sessions
 
-from utils.metrics import (
-    build_iptv_sessions,
-    compute_top_titles,
-    compute_watch_ranges,
-    has_invalid_extra,
-    process_top_name_watch_time,
-)
+from processors import get_processor
 
-EVENT_TYPE = "LiveUsage"
 
 OUTPUT_DIR = "/opt/airflow/output"
-
-CLEAN_PATH = f"{OUTPUT_DIR}/liveusage_clean.parquet"
-
+CLEAN_PATH = f"{OUTPUT_DIR}/iptv_2026-05-20.parquet"
 SESSIONS_PATH = f"{OUTPUT_DIR}/liveusage_iptv_sessions.parquet"
 
-
-def get_metric_function(name):
-
-    mapping = {
-        "top_name_watch_time": process_top_name_watch_time,
-        "top_titles": compute_top_titles,
-        "watch_range": compute_watch_ranges,
-    }
-
-    return mapping[name]
+EVENT_TYPES = [
+    "LiveUsage",
+    "RESTARTUsage",
+    "STARTOVERUsage",
+]
 
 
 @dag(
-    dag_id="liveusage_pipeline",
+    dag_id="usage_pipeline",
     start_date=datetime(2024, 1, 1),
     schedule=None,
     catchup=False,
-    max_active_tasks=3,
-    tags=["liveusage"],
+    max_active_tasks=1,
+    tags=["usage"],
 )
-def liveusage_pipeline():
-
-    @task
-    def metric_names():
-
-        # 1. Povuce metric names
-
-        return [
-            "top_name_watch_time",
-            "top_titles",
-            "watch_range",
-        ]
+def usage_pipeline():
 
     @task
     def clean_data():
 
-        # # 2. Ucita LiveUsage
-        # # 3. Provjeri invalid_extra
+        print("Loading data in chunks...")
 
-        # print("Loading LiveUsage data...")
+        os.makedirs(OUTPUT_DIR, exist_ok=True)
 
-        # df = load_event_data(EVENT_TYPE)
+        writers = {}
 
-        # if df.empty:
-        #     raise ValueError("No LiveUsage data found")
+        total_before = 0
+        total_after = 0
 
-        # print(f"Rows before cleaning: {len(df)}")
+        for i, chunk in enumerate(load_data(chunksize=10_000)):
+            chunk = optimize_dataframe(chunk)
 
-        # mask = df["extra"].map(has_invalid_extra)
+            total_before += len(chunk)
 
-        # df = df.loc[~mask].copy()
+            mask = chunk["extra"].map(has_invalid_extra)
+            chunk = chunk.loc[~mask].copy()
 
-        # print(f"Rows after cleaning: {len(df)}")
+            if chunk.empty:
+                del chunk, mask
+                continue
 
-        # if df.empty:
-        #     raise ValueError("No valid rows after cleaning")
+            total_after += len(chunk)
 
-        # os.makedirs(
-        #     OUTPUT_DIR,
-        #     exist_ok=True,
-        # )
+            chunk["insertedTS"] = pd.to_datetime(chunk["insertedTS"])
+            chunk["event_date"] = chunk["insertedTS"].dt.date.astype(str)
 
-        # df.to_parquet(
-        #     CLEAN_PATH,
-        #     index=False,
-        # )
+            for event_date, df_date in chunk.groupby("event_date"):
+                file_path = f"{OUTPUT_DIR}/iptv_{event_date}.parquet"
+
+                df_date = df_date.drop(columns=["event_date"])
+
+                table = pa.Table.from_pandas(
+                    df_date,
+                    preserve_index=False,
+                )
+
+                if event_date not in writers:
+                    writers[event_date] = pq.ParquetWriter(
+                        file_path,
+                        table.schema,
+                    )
+
+                writers[event_date].write_table(table)
+
+                print(f"Chunk {i}, date={event_date}: rows={len(df_date)}")
+
+                del df_date, table
+
+            del chunk, mask
+
+        for writer in writers.values():
+            writer.close()
+
+        if not writers:
+            raise ValueError("No valid rows after cleaning")
+
+        print(f"Rows before cleaning: {total_before}")
+        print(f"Rows after cleaning: {total_after}")
+        print(f"Saved parquet files to: {OUTPUT_DIR}")
 
         return CLEAN_PATH
 
     @task
-    def build_sessions(
-        parquet_path: str,
-    ):
+    def build_liveusage_sessions(parquet_path: str):
+        df_clean = pd.read_parquet(parquet_path, filters=[("type", "==", "LiveUsage")])
 
-        # # 4. build_iptv_session
+        sessions = build_iptv_sessions(df_clean)
 
-        # print("Building IPTV sessions...")
+        if sessions.empty:
+            raise ValueError("No LiveUsage sessions created")
 
-        # df = pd.read_parquet(parquet_path)
+        sessions.to_parquet(
+            SESSIONS_PATH,
+            index=False,
+        )
 
-        # sessions = build_iptv_sessions(df)
-
-        # if sessions.empty:
-        #     raise ValueError("No IPTV sessions built")
-
-        # print(f"Built IPTV sessions: {len(sessions)}")
-
-        # sessions.to_parquet(
-        #     SESSIONS_PATH,
-        #     index=False,
-        # )
+        print(f"Rows: {len(sessions)}")
 
         return SESSIONS_PATH
 
     @task
-    def process_metric(
-        metric_name: str,
-        sessions_path: str,
-    ):
+    def process_event_type(event_type: str, cleaned_path: str, sessions_path: str):
 
-        print(f"Processing metric: {metric_name}")
+        print(f"Processing event type: {event_type}")
 
-        sessions = pd.read_parquet(sessions_path)
+        df_clean = pd.read_parquet(cleaned_path, filters=[("type", "==", event_type)])
 
-        if sessions.empty:
-            print("No sessions found")
+        df_sessions = pd.read_parquet(sessions_path)
+
+        if df_clean.empty:
+            print(f"No data for {event_type}")
             return
 
-        metric_func = get_metric_function(metric_name)
+        processor = get_processor(event_type)
 
-        result = metric_func(sessions)
+        if event_type == "LiveUsage":
+            tables = processor(df_sessions)  # type: ignore
+        else:
+            tables = processor(df_clean)  # type: ignore
 
-        if result.empty:
-            print(f"Empty result for {metric_name}")
-            return
+        for table_name, result_df in tables.items():
+            if result_df.empty:
+                print(f"Skipping empty table: {table_name}")
+                continue
 
-        result["event_date"] = date.today()
+            result_df["event_date"] = df_clean["insertedTS"].dt.date.max()
 
-        save_result(
-            result,
-            f"liveusage_{metric_name}",
-        )
+            full_name = f"{event_type.lower()}_{table_name}"
 
-        print(f"Saved liveusage_{metric_name}")
+            save_result(
+                result_df,
+                full_name,
+            )
+
+            print(f"Saved table: {full_name}")
 
     cleaned_path = clean_data()
+    sessions_path = build_liveusage_sessions(cleaned_path)  # type: ignore
 
-    sessions_path = build_sessions(cleaned_path)  # type: ignore
+    process_event_type.partial(
+        cleaned_path=cleaned_path, sessions_path=sessions_path
+    ).expand(
+        event_type=EVENT_TYPES,
+    )
 
-    process_metric.partial(
-        sessions_path=sessions_path,
-    ).expand(metric_name=metric_names())
 
-
-dag = liveusage_pipeline()
+dag = usage_pipeline()

@@ -11,7 +11,6 @@ def process(df: pd.DataFrame) -> dict[str, pd.DataFrame]:
             "result": pd.DataFrame(),
         }
     df = df.copy()
-    df = df[df["duration"] <= 400000]
 
     df = df.reset_index(drop=True)
 

@@ -2,8 +2,8 @@ import pandas as pd
 from utils.metrics import (
     count_name_occurrences,
     sum_sessions,
-    has_invalid_extra,
     extract_columns_from_extra,
+    merge_name_with_fallback,
 )
 
 
@@ -13,21 +13,25 @@ def process(df: pd.DataFrame) -> dict[str, pd.DataFrame]:
             "result": pd.DataFrame(),
         }
 
-    df = df.copy()
-    mask = df["extra"].apply(has_invalid_extra)
-    df = df[~mask]
-    df = df[df["duration"] <= 400000]
-
     df = extract_columns_from_extra(
         df,
         column="extra",
-        keys=["programId"],
+        keys=["programId", "title"],
     )
 
-    df = df.reset_index(drop=True)
+    df.drop(columns=["name"], inplace=True)
 
-    sum_sess = sum_sessions(df, ["programId"])
+    df_live = pd.read_parquet(
+        "/opt/airflow/output/liveusage_iptv_sessions.parquet",
+        columns=["programId", "title", "name"],
+    )
 
-    result = count_name_occurrences(sum_sess, 0, ["name", "programId"])
+    df_live = df_live.drop_duplicates(["programId", "title"])
+
+    df = merge_name_with_fallback(df, df_live)
+
+    sum_sess = sum_sessions(df, ["programId", "title"])
+
+    result = count_name_occurrences(sum_sess, 0, ["name", "title", "programId"])
 
     return {"result": result}

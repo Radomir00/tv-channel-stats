@@ -1,7 +1,7 @@
 import pandas as pd
 from sqlalchemy import create_engine, text
 
-DB_URI = "mysql+pymysql://statsuser:statspass@host.docker.internal:3306/statsdb"
+DB_URI = "mysql+pymysql://statsuser:statspass@127.0.0.1:3306/statsdb"
 
 engine = create_engine(DB_URI)
 
@@ -41,6 +41,26 @@ def load_event_types() -> list[str]:
     df = pd.read_sql(query, engine)
 
     return list(df["type"].dropna().astype(str))  # type: ignore
+
+
+def load_data(chunksize=10_000):
+    query = text("""
+        SELECT
+            devRef,
+            name,
+            type,
+            duration,
+            extra,
+            insertedTS,
+            timeZone
+        FROM statistic
+        WHERE duration <= 400000
+          AND JSON_VALID(extra)
+    """)
+
+    return pd.read_sql_query(
+        query, engine.execution_options(stream_results=True), chunksize=chunksize
+    )
 
 
 def load_event_data(event_type: str) -> pd.DataFrame:

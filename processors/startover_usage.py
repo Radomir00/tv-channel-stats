@@ -2,7 +2,6 @@ import pandas as pd
 from utils.metrics import (
     count_name_occurrences,
     sum_sessions,
-    has_invalid_extra,
     extract_columns_from_extra,
 )
 
@@ -12,10 +11,6 @@ def process(df: pd.DataFrame) -> dict[str, pd.DataFrame]:
         return {
             "result": pd.DataFrame(),
         }
-    df = df.copy()
-    mask = df["extra"].apply(has_invalid_extra)
-    df = df[~mask]
-    df = df[df["duration"] <= 400000]
 
     df = extract_columns_from_extra(
         df,
@@ -27,5 +22,5 @@ def process(df: pd.DataFrame) -> dict[str, pd.DataFrame]:
 
     sum_sess = sum_sessions(df, ["programId", "title"])
 
-    result = count_name_occurrences(sum_sess, 0, ["name", "title"])
+    result = count_name_occurrences(sum_sess, 0, ["name", "title", "programId"])
     return {"result": result}

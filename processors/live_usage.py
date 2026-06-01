@@ -1,36 +1,37 @@
 import pandas as pd
 
 from utils.metrics import (
-    has_invalid_extra,
-    count_name_occurrences,
+    build_iptv_sessions,
     sum_sessions,
-    total_channel_watch_time,
+    process_top_name_watch_time,
     compute_top_titles,
+    compute_watch_ranges,
 )
 
+SESSIONS_PATH = "/opt/airflow/output/liveusage_iptv_sessions.parquet"
 
-def process(df: pd.DataFrame) -> dict[str, pd.DataFrame]:
+
+def process(
+    df: pd.DataFrame,
+) -> dict[str, pd.DataFrame]:
 
     if df.empty:
         return {
-            "channels_by_time": pd.DataFrame(),
-            "channels_by_users": pd.DataFrame(),
+            "top_name_watch_time": pd.DataFrame(),
             "top_titles": pd.DataFrame(),
+            "watch_range": pd.DataFrame(),
         }
 
-    mask = df["extra"].map(has_invalid_extra)
-    df = df.loc[~mask]  # type: ignore
+    sum_sess = sum_sessions(df, dur="total_duration")
 
-    sum_sess = sum_sessions(df)
-
-    channels_by_time = total_channel_watch_time(sum_sess)
-
-    channels_by_users = count_name_occurrences(sum_sess)
+    top_name_watch_time = process_top_name_watch_time(sum_sess)
 
     top_titles = compute_top_titles(df)
 
+    watch_range = compute_watch_ranges(df)
+
     return {
-        "channels_by_time": channels_by_time,
-        "channels_by_users": channels_by_users,
+        "top_name_watch_time": top_name_watch_time,
         "top_titles": top_titles,
+        "watch_range": watch_range,
     }
