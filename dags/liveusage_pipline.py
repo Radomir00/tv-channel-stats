@@ -2,6 +2,8 @@ import os
 import sys
 import pyarrow as pa
 import pyarrow.parquet as pq
+from typing import Any
+
 from datetime import datetime
 
 import pandas as pd
@@ -19,8 +21,6 @@ from processors import get_processor
 
 
 OUTPUT_DIR = "/opt/airflow/output"
-CLEAN_PATH = f"{OUTPUT_DIR}/iptv_2026-05-20.parquet"
-SESSIONS_PATH = f"{OUTPUT_DIR}/liveusage_iptv_sessions.parquet"
 
 EVENT_TYPES = [
     "LiveUsage",
@@ -40,16 +40,17 @@ EVENT_TYPES = [
 def usage_pipeline():
 
     @task
-    def clean_data():
-
+    def clean_data() -> str:
         print("Loading data in chunks...")
 
         os.makedirs(OUTPUT_DIR, exist_ok=True)
 
-        writers = {}
-
         total_before = 0
         total_after = 0
+
+        writer = None
+        parquet_path = None
+        first_date = None
 
         for i, chunk in enumerate(load_data(chunksize=10_000)):
             chunk = optimize_dataframe(chunk)
@@ -63,50 +64,60 @@ def usage_pipeline():
                 del chunk, mask
                 continue
 
+            chunk["insertedTS"] = pd.to_datetime(chunk["insertedTS"])
+
+            if first_date is None:
+                first_date = chunk["insertedTS"].dt.date.min()
+                parquet_path = f"{OUTPUT_DIR}/iptv_{first_date}.parquet"
+
             total_after += len(chunk)
 
-            chunk["insertedTS"] = pd.to_datetime(chunk["insertedTS"])
-            chunk["event_date"] = chunk["insertedTS"].dt.date.astype(str)
+            table = pa.Table.from_pandas(
+                chunk,
+                preserve_index=False,
+            )
 
-            for event_date, df_date in chunk.groupby("event_date"):
-                file_path = f"{OUTPUT_DIR}/iptv_{event_date}.parquet"
-
-                df_date = df_date.drop(columns=["event_date"])
-
-                table = pa.Table.from_pandas(
-                    df_date,
-                    preserve_index=False,
+            if writer is None:
+                writer = pq.ParquetWriter(
+                    parquet_path,
+                    table.schema,
                 )
 
-                if event_date not in writers:
-                    writers[event_date] = pq.ParquetWriter(
-                        file_path,
-                        table.schema,
-                    )
+            writer.write_table(table)
 
-                writers[event_date].write_table(table)
+            print(f"Chunk {i}: rows={len(chunk)}")
 
-                print(f"Chunk {i}, date={event_date}: rows={len(df_date)}")
+            del chunk, mask, table
 
-                del df_date, table
-
-            del chunk, mask
-
-        for writer in writers.values():
+        if writer is not None:
             writer.close()
 
-        if not writers:
+        if parquet_path is None:
             raise ValueError("No valid rows after cleaning")
 
         print(f"Rows before cleaning: {total_before}")
         print(f"Rows after cleaning: {total_after}")
-        print(f"Saved parquet files to: {OUTPUT_DIR}")
+        print(f"Saved parquet file: {parquet_path}")
 
-        return CLEAN_PATH
+        # parquet_path = f"{OUTPUT_DIR}/iptv_2026-05-20.parquet"
+
+        return parquet_path
 
     @task
-    def build_liveusage_sessions(parquet_path: str):
-        df_clean = pd.read_parquet(parquet_path, filters=[("type", "==", "LiveUsage")])
+    def build_liveusage_sessions(parquet_path: Any) -> str:
+
+        file_name = os.path.basename(parquet_path)
+        event_date = file_name.replace("iptv_", "").replace(".parquet", "")
+
+        sessions_path = f"{OUTPUT_DIR}/liveusage_iptv_sessions_{event_date}.parquet"
+
+        df_clean = pd.read_parquet(
+            parquet_path,
+            filters=[("type", "==", "LiveUsage")],
+        )
+
+        if df_clean.empty:
+            raise ValueError("No LiveUsage data found")
 
         sessions = build_iptv_sessions(df_clean)
 
@@ -114,22 +125,29 @@ def usage_pipeline():
             raise ValueError("No LiveUsage sessions created")
 
         sessions.to_parquet(
-            SESSIONS_PATH,
+            sessions_path,
             index=False,
         )
 
+        print(f"Saved sessions to: {sessions_path}")
         print(f"Rows: {len(sessions)}")
 
-        return SESSIONS_PATH
+        # sessions_path = f"{OUTPUT_DIR}/liveusage_iptv_sessions_2026-05-20.parquet"
+
+        return sessions_path
 
     @task
-    def process_event_type(event_type: str, cleaned_path: str, sessions_path: str):
-
+    def process_event_type(
+        event_type: str,
+        cleaned_path: Any,
+        sessions_path: Any,
+    ) -> None:
         print(f"Processing event type: {event_type}")
 
-        df_clean = pd.read_parquet(cleaned_path, filters=[("type", "==", event_type)])
-
-        df_sessions = pd.read_parquet(sessions_path)
+        df_clean = pd.read_parquet(
+            cleaned_path,
+            filters=[("type", "==", event_type)],
+        )
 
         if df_clean.empty:
             print(f"No data for {event_type}")
@@ -138,16 +156,28 @@ def usage_pipeline():
         processor = get_processor(event_type)
 
         if event_type == "LiveUsage":
-            tables = processor(df_sessions)  # type: ignore
+            df_sessions = pd.read_parquet(sessions_path)
+
+            if df_sessions.empty:
+                print("No sessions for LiveUsage")
+                return
+
+            tables = processor(df_sessions)
+
+        elif event_type == "RESTARTUsage":
+            tables = processor(df_clean, sessions_path)
+
         else:
-            tables = processor(df_clean)  # type: ignore
+            tables = processor(df_clean)
+
+        event_date = df_clean["insertedTS"].dt.date.min()
 
         for table_name, result_df in tables.items():
             if result_df.empty:
                 print(f"Skipping empty table: {table_name}")
                 continue
 
-            result_df["event_date"] = df_clean["insertedTS"].dt.date.max()
+            result_df["event_date"] = event_date
 
             full_name = f"{event_type.lower()}_{table_name}"
 
@@ -159,10 +189,12 @@ def usage_pipeline():
             print(f"Saved table: {full_name}")
 
     cleaned_path = clean_data()
-    sessions_path = build_liveusage_sessions(cleaned_path)  # type: ignore
+
+    sessions_path = build_liveusage_sessions(cleaned_path)
 
     process_event_type.partial(
-        cleaned_path=cleaned_path, sessions_path=sessions_path
+        cleaned_path=cleaned_path,
+        sessions_path=sessions_path,
     ).expand(
         event_type=EVENT_TYPES,
     )

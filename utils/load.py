@@ -1,9 +1,17 @@
 import pandas as pd
 from sqlalchemy import create_engine, text
 
-DB_URI = "mysql+pymysql://statsuser:statspass@127.0.0.1:3306/statsdb"
+DB_URI = "mysql+pymysql://statsuser:statspass@172.17.0.3:3306/statsdb?charset=utf8mb4"
 
-engine = create_engine(DB_URI)
+
+engine = create_engine(
+    DB_URI,
+    pool_pre_ping=True,
+    connect_args={
+        "charset": "utf8mb4",
+        "use_unicode": True,
+    },
+)
 
 
 def optimize_dataframe(df: pd.DataFrame) -> pd.DataFrame:
@@ -53,7 +61,7 @@ def load_data(chunksize=10_000):
             extra,
             insertedTS,
             timeZone
-        FROM statistic
+        FROM statistic_2026_04_21
         WHERE duration <= 400000
           AND JSON_VALID(extra)
     """)

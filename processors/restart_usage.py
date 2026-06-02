@@ -1,4 +1,5 @@
 import pandas as pd
+
 from utils.metrics import (
     count_name_occurrences,
     sum_sessions,
@@ -7,7 +8,11 @@ from utils.metrics import (
 )
 
 
-def process(df: pd.DataFrame) -> dict[str, pd.DataFrame]:
+def process(
+    df: pd.DataFrame,
+    sessions_path: str,
+) -> dict[str, pd.DataFrame]:
+
     if df.empty:
         return {
             "result": pd.DataFrame(),
@@ -22,7 +27,7 @@ def process(df: pd.DataFrame) -> dict[str, pd.DataFrame]:
     df.drop(columns=["name"], inplace=True)
 
     df_live = pd.read_parquet(
-        "/opt/airflow/output/liveusage_iptv_sessions.parquet",
+        sessions_path,
         columns=["programId", "title", "name"],
     )
 
@@ -32,6 +37,10 @@ def process(df: pd.DataFrame) -> dict[str, pd.DataFrame]:
 
     sum_sess = sum_sessions(df, ["programId", "title"])
 
-    result = count_name_occurrences(sum_sess, 0, ["name", "title", "programId"])
+    result = count_name_occurrences(
+        sum_sess,
+        0,
+        ["name", "title", "programId"],
+    )
 
     return {"result": result}

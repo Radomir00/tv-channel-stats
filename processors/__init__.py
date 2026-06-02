@@ -1,4 +1,4 @@
-from typing import Callable, Dict
+from typing import Callable, Dict, Any
 import pandas as pd
 
 # import svih processora
@@ -20,7 +20,7 @@ from .vod_usage_movie import process as process_vod_usage_movie
 from .default import process as process_default
 
 
-Processor = Callable[[pd.DataFrame], dict[str, pd.DataFrame]]
+Processor = Callable[..., dict[str, pd.DataFrame]]
 
 
 PROCESSORS: Dict[str, Processor] = {
